@@ -22,6 +22,10 @@ data Style = Style (Maybe Color) -- background
 
 type Color = (Int, Int, Int, Int)
 
+instance Monoid Style where
+    mempty = defaultStyle
+    mappend = combineStylePars
+
 -- TODO: make constructors aware of limitations
 style a b c d e = Style (Just a) (Just b) (Just c) (Just d) (Just e)
 
@@ -32,7 +36,8 @@ textColor x = Style Nothing Nothing (Just x) Nothing Nothing
 fontSize x = Style Nothing Nothing Nothing (Just x) Nothing
 alertSound x = Style Nothing Nothing Nothing Nothing (Just x)
 
-(<+) = combineStylePars
+(<+) :: Style -> Style -> Style
+(<+) = mappend
 
 combineStylePars :: Style -> Style -> Style
 combineStylePars (Style x1 x2 x3 x4 x5) (Style y1 y2 y3 y4 y5) =
@@ -54,16 +59,16 @@ fontSizeCode (Style _ _ _ x _) = genericParameter "SetFontSize" x
 alertSoundCode (Style _ _ _ _ x) = soundParameter "PlayAlertSound" x
 
 genericParameter _ Nothing = ""
-genericParameter keyword (Just arg) = keyword <> show arg ++ newline
+genericParameter keyword (Just arg) = keyword +++ show arg ++ newline
 
 colorParameter _ Nothing = ""
-colorParameter keyword (Just arg) = keyword <> showColor arg ++ newline
+colorParameter keyword (Just arg) = keyword +++ showColor arg ++ newline
 
 soundParameter _ Nothing = ""
-soundParameter keyword (Just (i,v)) = keyword <> show i <> show v ++ newline
+soundParameter keyword (Just (i,v)) = keyword +++ show i +++ show v ++ newline
 
-showColor (r, g, b, a) = show r <> show g <> show b <> show a
+showColor (r, g, b, a) = show r +++ show g +++ show b +++ show a
 
-xs <> ys = xs ++ " " ++ ys
+xs +++ ys = xs ++ " " ++ ys
 
 newline = "\n"
