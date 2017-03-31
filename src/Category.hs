@@ -14,6 +14,7 @@ module Category (
   ItemClass (..),
   --
   nothing,
+  everything,
   itemLevel,
   dropLevel,
   quality,
@@ -33,6 +34,7 @@ import           Data.List                    (isInfixOf, nub, (\\))
 import           Text.ParserCombinators.ReadP as ReadP
 import           Text.Read                    as Read
 
+import           Data.Functor.Classes
 import           Data.Functor.Foldable
 
 -- primitive categories
@@ -202,6 +204,16 @@ data Category = MkC { formula :: Formula PrimCat
                     , dnf     :: CategoryDNF }
 -- the dnf for a Category is only evaluated once, and only if needed
 
+instance Show a => Show1 (FormulaF a) where
+    --liftShowsPrec :: (Int -> b -> ShowS) -> ([b] -> ShowS) -> Int -> FormulaF a -> (String -> String)
+    liftShowsPrec _ _ _ EmptyFormula = showString "EmptyFormula "
+    liftShowsPrec _ _ d (Base x) = showString "Base " . showsPrec d x
+    liftShowsPrec _ g _ (And x1 x2) = showString "And " . g [x1, x2]
+    liftShowsPrec _ g _ (Or x1 x2) = showString "Or " . g [x1, x2]
+
+instance Show Category where
+    show (MkC f _) = show f
+
 newtype DNF a = DNF {conditions :: [[a]]}
 type CategoryDNF = DNF PrimCat
 
@@ -299,6 +311,9 @@ check f g cs = f . map (g . makeList) where
 -- generation functions
 nothing :: Category
 nothing = makeCategory $ Fix EmptyFormula
+
+everything :: Category
+everything = MkC (error "Error: Trying to access universal formula!") (DNF [[]])
 
 itemLevel :: Ordering -> Int -> Category
 dropLevel :: Ordering -> Int -> Category
