@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 module Category (
   Category,
   union,
@@ -5,6 +6,7 @@ module Category (
   intersect,
   implementCategory,
   optimize,
+  overlap,
   --
   RarityLevel (..),
   SocketColor (..),
@@ -12,7 +14,6 @@ module Category (
   ItemClass (..),
   --
   nothing,
-  everything,
   itemLevel,
   dropLevel,
   quality,
@@ -27,10 +28,12 @@ module Category (
   height
   ) where
 
-import           Data.List                    (nub)
+import           Data.List                    (isInfixOf, nub, (\\))
 
 import           Text.ParserCombinators.ReadP as ReadP
 import           Text.Read                    as Read
+
+import           Data.Functor.Foldable
 
 -- primitive categories
 data PrimCat = ItemLevel Ordering Int
@@ -49,15 +52,15 @@ data PrimCat = ItemLevel Ordering Int
 -- TODO: check for valid values
 
 data RarityLevel = Normal | Magic | Rare | Unique
-                 deriving (Eq,Show,Read,Enum)
+                 deriving (Eq,Show,Read,Enum,Ord)
 
 data SocketColor = Red | Green | Blue | White
                  deriving (Eq,Enum)
 
 instance Show SocketColor where
-  show Red = "R"
+  show Red   = "R"
   show Green = "G"
-  show Blue = "B"
+  show Blue  = "B"
   show White = "W"
 
 newtype ColorList = ColorList [SocketColor]
@@ -104,41 +107,41 @@ data ItemClass = ActiveSkillGems
                deriving (Eq, Enum)
 
 instance Show ItemClass where
-  show ActiveSkillGems = "Active Skill Gems"
-  show Amulets = "Amulets"
-  show Belts = "Belts"
-  show BodyArmour = "Body Armour"
-  show Boots = "Boots"
-  show Bows = "Bows"
-  show Claws = "Claws"
-  show Daggers = "Daggers"
-  show DivinationCard = "Divination Card"
-  show FishingRods = "Fishing Rods"
-  show Gloves = "Gloves"
-  show Helmets = "Helmets"
-  show HybridFlasks = "Hybrid Flasks"
-  show Jewel = "Jewel"
-  show LifeFlasks = "Life Flasks"
-  show ManaFlasks = "Mana Flasks"
-  show MapFragments = "Map Fragments"
-  show Maps = "Maps"
-  show OneHandAxes = "One Hand Axes"
-  show OneHandMaces = "One Hand Maces"
-  show OneHandSwords = "One Hand Sword"
-  show QuestItems = "Quest Items"
-  show Quivers = "Quivers"
-  show Rings = "Rings"
-  show Sceptres = "Sceptres"
-  show Shields = "Shields"
-  show StackableCurrency = "Currency"
-  show Staves = "Staves"
-  show SupportSkillGems = "Support Skill Gems"
+  show ActiveSkillGems        = "Active Skill Gems"
+  show Amulets                = "Amulets"
+  show Belts                  = "Belts"
+  show BodyArmour             = "Body Armour"
+  show Boots                  = "Boots"
+  show Bows                   = "Bows"
+  show Claws                  = "Claws"
+  show Daggers                = "Daggers"
+  show DivinationCard         = "Divination Card"
+  show FishingRods            = "Fishing Rods"
+  show Gloves                 = "Gloves"
+  show Helmets                = "Helmets"
+  show HybridFlasks           = "Hybrid Flasks"
+  show Jewel                  = "Jewel"
+  show LifeFlasks             = "Life Flasks"
+  show ManaFlasks             = "Mana Flasks"
+  show MapFragments           = "Map Fragments"
+  show Maps                   = "Maps"
+  show OneHandAxes            = "One Hand Axes"
+  show OneHandMaces           = "One Hand Maces"
+  show OneHandSwords          = "One Hand Sword"
+  show QuestItems             = "Quest Items"
+  show Quivers                = "Quivers"
+  show Rings                  = "Rings"
+  show Sceptres               = "Sceptres"
+  show Shields                = "Shields"
+  show StackableCurrency      = "Currency"
+  show Staves                 = "Staves"
+  show SupportSkillGems       = "Support Skill Gems"
   show ThrustingOneHandSwords = "Thrusting One Hand Swords"
-  show TwoHandAxes = "Two Hand Axes"
-  show TwoHandMaces = "Two Hand Maces"
-  show TwoHandSwords = "Two Hand Swords"
-  show UtilityFlasks = "Utility Flasks"
-  show Wands = "Wands"
+  show TwoHandAxes            = "Two Hand Axes"
+  show TwoHandMaces           = "Two Hand Maces"
+  show TwoHandSwords          = "Two Hand Swords"
+  show UtilityFlasks          = "Utility Flasks"
+  show Wands                  = "Wands"
 
 instance Read ItemClass where
   readPrec = Read.choice $ map (read'.show) [ActiveSkillGems .. Wands]
@@ -149,101 +152,153 @@ read' x = lift $ do
   return $ readItemClass x
 
 readItemClass :: String -> ItemClass
-readItemClass "Active Skill Gems" = ActiveSkillGems
-readItemClass "Amulets" = Amulets
-readItemClass "Belts" = Belts
-readItemClass "Body Armour" = BodyArmour
-readItemClass "Boots" = Boots
-readItemClass "Bows" = Bows
-readItemClass "Claws" = Claws
-readItemClass "Daggers" = Daggers
-readItemClass "Divination Card" = DivinationCard
-readItemClass "Fishing Rods" = FishingRods
-readItemClass "Gloves" = Gloves
-readItemClass "Helmets" = Helmets
-readItemClass "Hybrid Flasks" = HybridFlasks
-readItemClass "Jewel" = Jewel
-readItemClass "Life Flasks" = LifeFlasks
-readItemClass "Mana Flasks" = ManaFlasks
-readItemClass "Map Fragments" = MapFragments
-readItemClass "Maps" = Maps
-readItemClass "One Hand Axes" = OneHandAxes
-readItemClass "One Hand Maces" = OneHandMaces
-readItemClass "One Hand Sword" = OneHandSwords
-readItemClass "Quest Items" = QuestItems
-readItemClass "Quivers" = Quivers
-readItemClass "Rings" = Rings
-readItemClass "Sceptres" = Sceptres
-readItemClass "Shields" = Shields
-readItemClass "Currency" = StackableCurrency
-readItemClass "Staves" = Staves
-readItemClass "Support Skill Gems" = SupportSkillGems
+readItemClass "Active Skill Gems"         = ActiveSkillGems
+readItemClass "Amulets"                   = Amulets
+readItemClass "Belts"                     = Belts
+readItemClass "Body Armour"               = BodyArmour
+readItemClass "Boots"                     = Boots
+readItemClass "Bows"                      = Bows
+readItemClass "Claws"                     = Claws
+readItemClass "Daggers"                   = Daggers
+readItemClass "Divination Card"           = DivinationCard
+readItemClass "Fishing Rods"              = FishingRods
+readItemClass "Gloves"                    = Gloves
+readItemClass "Helmets"                   = Helmets
+readItemClass "Hybrid Flasks"             = HybridFlasks
+readItemClass "Jewel"                     = Jewel
+readItemClass "Life Flasks"               = LifeFlasks
+readItemClass "Mana Flasks"               = ManaFlasks
+readItemClass "Map Fragments"             = MapFragments
+readItemClass "Maps"                      = Maps
+readItemClass "One Hand Axes"             = OneHandAxes
+readItemClass "One Hand Maces"            = OneHandMaces
+readItemClass "One Hand Sword"            = OneHandSwords
+readItemClass "Quest Items"               = QuestItems
+readItemClass "Quivers"                   = Quivers
+readItemClass "Rings"                     = Rings
+readItemClass "Sceptres"                  = Sceptres
+readItemClass "Shields"                   = Shields
+readItemClass "Currency"                  = StackableCurrency
+readItemClass "Staves"                    = Staves
+readItemClass "Support Skill Gems"        = SupportSkillGems
 readItemClass "Thrusting One Hand Swords" = ThrustingOneHandSwords
-readItemClass "Two Hand Axes" = TwoHandAxes
-readItemClass "Two Hand Maces" = TwoHandMaces
-readItemClass "Two Hand Swords" = TwoHandSwords
-readItemClass "Utility Flasks" = UtilityFlasks
-readItemClass "Wands" = Wands
-readItemClass _ = undefined
+readItemClass "Two Hand Axes"             = TwoHandAxes
+readItemClass "Two Hand Maces"            = TwoHandMaces
+readItemClass "Two Hand Swords"           = TwoHandSwords
+readItemClass "Utility Flasks"            = UtilityFlasks
+readItemClass "Wands"                     = Wands
+readItemClass _                           = undefined
 
 -- "real" categories
-data Category = Empty | All | Category [[PrimCat]]
-  deriving (Show,Eq)
+data FormulaF a f
+  = Base a
+  | And f f
+  | Or f f
+  | EmptyFormula
+  deriving Functor
 
-conditions :: Category -> [[PrimCat]]
-conditions (Category xss) = xss
-conditions Empty = []
-conditions All = undefined
+type Formula a = Fix (FormulaF a)
+data Category = MkC { formula :: Formula PrimCat
+                    , dnf     :: CategoryDNF }
+-- the dnf for a Category is only evaluated once, and only if needed
+
+newtype DNF a = DNF {conditions :: [[a]]}
+type CategoryDNF = DNF PrimCat
+
+makeCategory :: Formula PrimCat -> Category
+makeCategory f = MkC f (computeDnf f)
+
+emptyCategory :: Category
+emptyCategory = MkC (Fix EmptyFormula) (DNF [])
+
+computeDnf :: Formula a -> DNF a
+computeDnf = cata phi where
+  phi (Base x)                  = DNF [[x]]
+  phi (And (DNF xss) (DNF yss)) = DNF [a ++ b | a <- xss, b <- yss]
+  phi (Or (DNF xss) (DNF yss))  = DNF $ xss ++ yss
+  phi EmptyFormula              = DNF []
 
 union :: Category -> Category -> Category
-union Empty x = x
-union x Empty = x
-union All _ = All
-union _ All = All
-union x y = Category (conditions x ++ conditions y)
+union x (MkC (Fix EmptyFormula) _) = x
+union (MkC (Fix EmptyFormula) _) y = y
+union (MkC f _) (MkC f' _)         = makeCategory (Fix $ Or f f')
 
 intersect :: Category -> Category -> Category
-intersect Empty _ = Empty
-intersect _ Empty = Empty
-intersect All x = x
-intersect x All = x
-intersect x y = Category (conditions x `cross` conditions y)
-  where xss `cross` yss = [ xs ++ ys | xs <- xss, ys <- yss]
+intersect _ (MkC (Fix EmptyFormula) _) = emptyCategory
+intersect (MkC (Fix EmptyFormula) _) _ = emptyCategory
+intersect (MkC f _) (MkC f' _)      = makeCategory (Fix $ And f f')
 
 -- utility
 unionAll :: [Category] -> Category
-unionAll = foldl union Empty
+unionAll = foldl union nothing
 
 primitive :: PrimCat -> Category
-primitive p = Category [[p]]
+primitive = makeCategory . Fix . Base
 
 -- optimization/simplification functions
--- optimizes tries to find obviously empty conditions and removes them
+-- optimize tries to find obviously empty conditions and removes them
+{-# DEPRECATED optimize "optimization is now the default behaviour" #-}
 optimize :: Category -> Category
-optimize = filterClassConflicts
+optimize = id
 
-filterClassConflicts :: Category -> Category
-filterClassConflicts (Category xss) = Category $ filter (not.hasClassConflict) xss
-filterClassConflicts x = x
+optimize' :: CategoryDNF -> CategoryDNF
+optimize' = filterClassConflicts
+
+filterClassConflicts :: CategoryDNF -> CategoryDNF
+filterClassConflicts (DNF xss) = DNF $ filter (not.hasClassConflict) xss
 
 hasClassConflict :: [PrimCat] -> Bool
 hasClassConflict = (>1).length.nub.filter isClassCond
   where isClassCond (Class _) = True
         isClassCond _         = False
 
-joinBaseTypes :: Category -> Category
-joinBaseTypes Empty = Empty
-joinBaseTypes All = All
-joinBaseTypes (Category xss) = Category $ map (unifyBaseType ([],BaseType [])) xss
-  where unifyBaseType (others, bt) [] = bt:others
-        unifyBaseType (others, BaseType bts) (BaseType x:xs) = unifyBaseType (others, BaseType (x++bts)) xs
-        unifyBaseType (others, bt) (x:xs) = unifyBaseType (x:others, bt) xs
+-- check two categories for overlap
+overlap :: Category -> Category -> Bool
+overlap c c' = or $ overlapPrimCats <$> xss <*> yss where
+    (DNF xss, DNF yss) = (dnf c, dnf c')
+
+overlapPrimCats :: [PrimCat] -> [PrimCat] -> Bool
+overlapPrimCats xs ys = or $ primOverlap <$> xs <*> ys
+
+primOverlap :: PrimCat -> PrimCat -> Bool
+primOverlap (ItemLevel o n) (ItemLevel o' n')
+    = satisfiable [(o,n),(o',n')] [1..100]
+primOverlap (DropLevel o n) (DropLevel o' n')
+    = satisfiable [(o,n),(o',n')] [1..100]
+primOverlap (Quality o n) (Quality o' n')
+    = satisfiable [(o,n),(o',n')] [0..20]
+primOverlap (Rarity o r) (Rarity o' r')
+    = satisfiable [(o,r),(o',r')] [Normal .. Unique]
+primOverlap (Class c) (Class c')
+    = c == c'
+primOverlap (BaseType ss) (BaseType ss')
+    = any (uncurry isInfixOf) [(s, s') | s <- ss ++ ss', s' <- ss ++ ss' ]
+primOverlap (Sockets o n) (Sockets o' n')
+    = satisfiable [(o,n),(o',n')] [0..6]
+primOverlap (LinkedSockets o n) (LinkedSockets o' n')
+    = satisfiable [(o,n),(o',n')] [0..6]
+primOverlap (SocketGroup (ColorList cs)) (SocketGroup (ColorList cs'))
+    = not . null $ cs \\ cs'
+primOverlap (Height o n) (Height o' n')
+    = satisfiable [(o,n),(o',n')] [1..5]
+primOverlap (Width o n) (Width o' n')
+    = satisfiable [(o,n),(o',n')] [1..5]
+primOverlap _ _ = True -- two different PrimCats always overlap
+
+satisfiable :: Ord a => [(Ordering, a)] -> [a] -> Bool
+satisfiable = check or and
+
+check :: Ord a => ([Bool] -> Bool) -- outer collapse func.
+                -> ([Bool] -> Bool) -- inner collapse func.
+                -> [(Ordering,a)] -- conditions
+                -> [a] -- values
+                -> Bool
+check f g cs = f . map (g . makeList) where
+  makeList j = map (\(ord,i) -> compare j i == ord) cs
 
 -- generation functions
 nothing :: Category
-nothing = Empty
-everything :: Category
-everything = All
+nothing = makeCategory $ Fix EmptyFormula
 
 itemLevel :: Ordering -> Int -> Category
 dropLevel :: Ordering -> Int -> Category
@@ -273,9 +328,7 @@ width o n = primitive $ Width o n
 -- create filter code for category
 -- each list element goes into an extra Show-block
 implementCategory :: Category -> [String]
-implementCategory Empty = []
-implementCategory All = [""]
-implementCategory c = [ concatMap implementPrimCat xs | xs <- conditions c ]
+implementCategory = map (concatMap implementPrimCat) . conditions . optimize' . dnf
 
 implementPrimCat :: PrimCat -> String
 implementPrimCat (ItemLevel ord n) = orderedParameter "ItemLevel" ord n
