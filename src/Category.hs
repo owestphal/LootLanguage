@@ -197,6 +197,7 @@ data FormulaF a f
   | And f f
   | Or f f
   | EmptyFormula
+  | All
   deriving Functor
 
 type Formula a = Fix (FormulaF a)
@@ -206,6 +207,7 @@ data Category = MkC { formula :: Formula PrimCat
 
 instance Show a => Show1 (FormulaF a) where
     --liftShowsPrec :: (Int -> b -> ShowS) -> ([b] -> ShowS) -> Int -> FormulaF a -> (String -> String)
+    liftShowsPrec _ _ _ All = showString "All "
     liftShowsPrec _ _ _ EmptyFormula = showString "EmptyFormula "
     liftShowsPrec _ _ d (Base x) = showString "Base " . showsPrec d x
     liftShowsPrec _ g _ (And x1 x2) = showString "And " . g [x1, x2]
@@ -214,7 +216,7 @@ instance Show a => Show1 (FormulaF a) where
 instance Show Category where
     show (MkC f _) = show f
 
-newtype DNF a = DNF {conditions :: [[a]]}
+newtype DNF a = DNF {conditions :: [[a]]} deriving Show
 type CategoryDNF = DNF PrimCat
 
 makeCategory :: Formula PrimCat -> Category
@@ -229,6 +231,7 @@ computeDnf = cata phi where
   phi (And (DNF xss) (DNF yss)) = DNF [a ++ b | a <- xss, b <- yss]
   phi (Or (DNF xss) (DNF yss))  = DNF $ xss ++ yss
   phi EmptyFormula              = DNF []
+  phi All                       = DNF [[]]
 
 union :: Category -> Category -> Category
 union x (MkC (Fix EmptyFormula) _) = x
@@ -270,7 +273,7 @@ overlap c c' = or $ overlapPrimCats <$> xss <*> yss where
     (DNF xss, DNF yss) = (dnf c, dnf c')
 
 overlapPrimCats :: [PrimCat] -> [PrimCat] -> Bool
-overlapPrimCats xs ys = or $ primOverlap <$> xs <*> ys
+overlapPrimCats xs ys = and $ primOverlap <$> xs <*> ys
 
 primOverlap :: PrimCat -> PrimCat -> Bool
 primOverlap (ItemLevel o n) (ItemLevel o' n')
@@ -313,7 +316,7 @@ nothing :: Category
 nothing = makeCategory $ Fix EmptyFormula
 
 everything :: Category
-everything = MkC (error "Error: Trying to access universal formula!") (DNF [[]])
+everything = makeCategory $ Fix All
 
 itemLevel :: Ordering -> Int -> Category
 dropLevel :: Ordering -> Int -> Category

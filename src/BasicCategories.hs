@@ -93,12 +93,9 @@ mirrors = baseType "Mirror of Kalandra"
 maps = itemClass Maps
 mapFragments = itemClass MapFragments
 
-lowTierMaps = unionAll $ map (intersect maps . baseType) lowTierMapBases
-lowTierShapedMaps = unionAll $ map (intersect maps . baseType) lowTierShapedBases
-midTierMaps = unionAll $ map (intersect maps . baseType) midTierMapBases
-midTierShapedMaps = unionAll $ map (intersect maps . baseType) midTierShapedBases
-highTierMaps = unionAll $ map (intersect maps . baseType) highTierMapBases
-highTierShapedMaps = unionAll $ map (intersect maps . baseType) highTierShapedBases
+lowTierMaps = maps `intersect` dropLevel LT 73
+midTierMaps = maps `intersect` dropLevel GT 72 `intersect` dropLevel LT 78
+highTierMaps = maps `intersect` dropLevel GT 77
 
 atlasItems = intersect currency $
  baseTypes ["Cartographer's Sextant", "Cartographer's Seal","Unshaping Orb"]
